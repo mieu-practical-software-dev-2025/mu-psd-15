@@ -11,6 +11,11 @@ load_dotenv()
 # このファイルと同じ階層に 'static' フォルダがあれば自動的にそこが使われます。
 app = Flask(__name__)
 
+# 履歴を保存するためのリスト（サーバーのメモリ上に保存）
+# 注: サーバーを再起動すると履歴は失われます。
+history_log = []
+
+
 # 開発モード時に静的ファイルのキャッシュを無効にする
 if app.debug:
     @app.after_request
@@ -43,11 +48,27 @@ if OPENROUTER_API_KEY:
         }
     )
 
-# URL:/ に対して、static/index.htmlを表示して
-    # クライアントサイドのVue.jsアプリケーションをホストする
+# URL:/ に対して、ホーム画面(home.html)を表示
 @app.route('/')
-def index():
+def home():
+    # staticフォルダに home.html を作成する必要があります
+    return send_from_directory(app.static_folder, 'home.html')
+
+# URL:/plot に対して、プロット生成画面(index.html)を表示
+@app.route('/plot')
+def plot_page():
     return send_from_directory(app.static_folder, 'index.html')
+
+# URL:/history に対して、履歴画面(history.html)を表示
+@app.route('/history')
+def history_page():
+    # staticフォルダに history.html を作成する必要があります
+    return send_from_directory(app.static_folder, 'history.html')
+
+# URL:/api/history で履歴データをJSONとして返す
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    return jsonify(history_log)
     
 # URL:/send_api に対するメソッドを定義
 @app.route('/send_api', methods=['POST'])
@@ -69,6 +90,13 @@ def send_api():
     if not received_text.strip(): # 空文字列や空白のみの文字列でないか確認
         app.logger.error("Received text is empty or whitespace.")
         return jsonify({"error": "Input text cannot be empty"}), 400
+
+    # 入力がキーワード群か（長すぎる文章でないか）を簡易的にチェック
+    # スペースとカンマで分割し、単語数を数える
+    word_count = len(received_text.replace('、', ' ').split())
+    if word_count > 10: # 例えば10単語より多い場合はエラーとする
+        app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
+        return jsonify({"error": "キーワード（『、』やスペースで区切ったもの）を10個以内で入力してください。"}), 400
     
     # contextがあればsystemプロンプトに設定、なければデフォルト値
     system_prompt = "あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを短く作ってください。また、300字以内で書いてください。" # デフォルトのシステムプロンプト
@@ -94,6 +122,8 @@ def send_api():
         # APIからのレスポンスを取得
         if chat_completion.choices and chat_completion.choices[0].message:
             processed_text = chat_completion.choices[0].message.content
+            # 正常に取得できたら履歴に追加
+            history_log.append({"user": received_text, "ai": processed_text})
         else:
             processed_text = "AIから有効な応答がありませんでした。"
             
