@@ -12,16 +12,16 @@
 <body>
 
     <div id="app" class="container">
-        <h2 class="mb-4">サンプルアプリ</h2>
+        <h2 class="mb-4">物語プロットジェネレーター</h2>
 
         <div class="mb-3">
-            <label for="inputText" class="form-label">テキストを入力してください:</label>
-            <textarea id="inputText" class="form-control" rows="5" v-model="inputText" placeholder="ここにテキストを入力..."></textarea>
+            <label for="inputText" class="form-label">キーワードをいくつか入力して（カンマやスペースで区切ってください）、物語のプロットを生成しよう！</label>
+            <textarea id="inputText" class="form-control" rows="5" v-model="inputText" placeholder="ここにキーワードを入力..."></textarea>
         </div>
 
         <div class="mb-3">
             <button @click="execute" class="btn btn-primary">実行</button>
-            <button @click="execute_kansai" class="btn btn-success ms-2">関西弁で実行</button>
+            <button @click="execute_kansai" class="btn btn-success ms-2">コメディ風で実行</button>
         </div>
         
         <h3>結果:</h3>
@@ -70,7 +70,7 @@
                     this.sendRequest();
                 },
                 execute_kansai() {
-                    this.sendRequest("あなたは親切な関西人です。ユーザーからの入力に対して、必ず関西弁で、親しみやすく、そして140字以内で回答してください。");
+                    this.sendRequest("あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを、コメディ風に面白く短く、300字以内で書いてください。");
                 }
             }
         }).mount('#app');

@@ -28,6 +28,20 @@ if app.debug:
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SITE_URL = os.getenv("YOUR_SITE_URL", "http://localhost:5000") # Default if not set
 APP_NAME = os.getenv("YOUR_APP_NAME", "FlaskVueApp") # Default if not set
+CHAT_MODEL = os.getenv("CHAT_MODEL", "google/gemma-3-27b-it:free") # Default model
+
+# OpenAI Clientのインスタンス化
+# アプリケーション起動時に一度だけ実行する
+client = None
+if OPENROUTER_API_KEY:
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+        default_headers={ # Recommended by OpenRouter
+            "HTTP-Referer": SITE_URL,
+            "X-Title": APP_NAME,
+        }
+    )
 
 # URL:/ に対して、static/index.htmlを表示して
     # クライアントサイドのVue.jsアプリケーションをホストする
@@ -38,19 +52,11 @@ def index():
 # URL:/send_api に対するメソッドを定義
 @app.route('/send_api', methods=['POST'])
 def send_api():
-    if not OPENROUTER_API_KEY:
+    if not client:
         app.logger.error("OpenRouter API key not configured.")
         return jsonify({"error": "OpenRouter API key is not configured on the server."}), 500
 
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OPENROUTER_API_KEY,
-        default_headers={ # Recommended by OpenRouter
-            "HTTP-Referer": SITE_URL,
-            "X-Title": APP_NAME,
-        }
-    )
-    
+  
     # POSTリクエストからJSONデータを取得
     data = request.get_json()
 
@@ -65,7 +71,7 @@ def send_api():
         return jsonify({"error": "Input text cannot be empty"}), 400
     
     # contextがあればsystemプロンプトに設定、なければデフォルト値
-    system_prompt = "140字以内で回答してください。" # デフォルトのシステムプロンプト
+    system_prompt = "あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを短く作ってください。また、300字以内で書いてください。" # デフォルトのシステムプロンプト
     if 'context' in data and data['context'] and data['context'].strip():
         system_prompt = data['context'].strip()
         app.logger.info(f"Using custom system prompt from context: {system_prompt}")
@@ -82,7 +88,7 @@ def send_api():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": received_text}
             ], # type: ignore
-            model="google/gemma-3-27b-it:free", 
+            model=CHAT_MODEL, 
         )
         
         # APIからのレスポンスを取得
