@@ -33,7 +33,7 @@ if app.debug:
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SITE_URL = os.getenv("YOUR_SITE_URL", "http://localhost:5000") # Default if not set
 APP_NAME = os.getenv("YOUR_APP_NAME", "FlaskVueApp") # Default if not set
-CHAT_MODEL = os.getenv("CHAT_MODEL", "google/gemma-3-27b-it:free") # Default model
+#CHAT_MODEL = os.getenv("CHAT_MODEL", "google/gemma-3-27b-it:free") # Default model
 
 # OpenAI Clientのインスタンス化
 # アプリケーション起動時に一度だけ実行する
@@ -104,13 +104,9 @@ def send_api():
         app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
         return jsonify({"error": "キーワード（『、』やスペースで区切ったもの）を10個以内で入力してください。"}), 400
     
-    # contextがあればsystemプロンプトに設定、なければデフォルト値
-    #system_prompt = "あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを短く、300字以内で作ってください。" # デフォルトのシステムプロンプト
-    if 'context' in data and data['context'] and data['context'].strip():
-        system_prompt = data['context'].strip()
-        app.logger.info(f"Using custom system prompt from context: {system_prompt}")
-    else:
-        app.logger.info(f"Using default system prompt: {system_prompt}")
+    # フロントエンドから渡されたcontextをsystemプロンプトとして使用
+    system_prompt = data.get('context', '').strip()
+    app.logger.info(f"Using custom system prompt from context: {system_prompt}")
 
     try:
         # OpenRouter APIを呼び出し
@@ -122,7 +118,7 @@ def send_api():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": received_text}
             ], # type: ignore
-            model=CHAT_MODEL, 
+            model="google/gemma-2-9b-it:free", 
         )
         
         # APIからのレスポンスを取得
@@ -168,10 +164,10 @@ def generate_name_api():
 
     # 名前生成用のシステムプロンプト
     if generation_type == 'surname':
-        system_prompt = f"あなたはクリエイティブな名前作成アシスタントです。ユーザーから提供された漢字「{received_text}」を苗字に含んだフルネームの候補を5つ提案してください。箇条書きで、名前の由来も簡潔に説明してください。"
+        system_prompt = f"あなたはプロの作家です。指定された漢字「{received_text}」を【苗字】に含んだ、創造的で記憶に残りやすいフルネームのキャラクター名を5つ提案してください。\n\n# 制約条件:\n- 提案は箇条書き（-）で記述してください。\n- それぞれの名前の横に、その名前が持つ雰囲気や由来を20字程度で簡潔に添えてください。\n- 一般的すぎない、物語の登場人物として魅力的な名前を重視してください。"
         history_user_text = f"「{received_text}」を苗字に含む名前"
     else: # 'given_name'
-        system_prompt = f"あなたはクリエイティブな名前作成アシスタントです。ユーザーから提供された漢字「{received_text}」を名前に含んだフルネームの候補を5つ提案してください。箇条書きで、名前の由来も簡潔に説明してください。"
+        system_prompt = f"あなたはプロの作家です。指定された漢字「{received_text}」を【名前】に含んだ、創造的で記憶に残りやすいフルネームのキャラクター名を5つ提案してください。\n\n# 制約条件:\n- 提案は箇条書き（-）で記述してください。\n- それぞれの名前の横に、その名前が持つ雰囲気や由来を20字程度で簡潔に添えてください。\n- 一般的すぎない、物語の登場人物として魅力的な名前を重視してください。"
         history_user_text = f"「{received_text}」を名前に含む名前"
 
     try:
@@ -180,7 +176,7 @@ def generate_name_api():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"「{received_text}」を含む名前を提案してください。"}
             ],
-            model=CHAT_MODEL,
+            model="mistralai/mistral-7b-instruct:free",
         )
 
         if chat_completion.choices and chat_completion.choices[0].message:
@@ -214,9 +210,13 @@ def proofread_api():
         app.logger.error("Received text for proofreading is empty.")
         return jsonify({"error": "校正する文章を入力してください。"}), 400
 
+    # 文字数制限をチェック
+    if len(received_text) > 500:
+        app.logger.error(f"Input text for proofreading is too long: {len(received_text)} characters.")
+        return jsonify({"error": "入力できる文字数は500文字までです。"}), 400
+
     # 校正用のシステムプロンプト
-    # 文字数制限した方がいいかも
-    system_prompt = "あなたは優秀な編集者です。以下の文章を、誤字脱字の修正、文法の改善、より自然で分かりやすい表現への変更など、総合的に校正してください。校正後の文章のみを出力してください。"
+    system_prompt = "あなたは優秀な編集者です。以下の文章を、誤字脱字の修正、文法的な誤りの訂正、句読点の適切な使用、より自然で分かりやすい表現への改善など、総合的に校正してください。\n\n# 指示:\n- 元の文章の意図やニュアンスを最大限尊重してください。\n- 校正後の文章のみを出力し、解説や前置きは一切含めないでください。"
 
     try:
         chat_completion = client.chat.completions.create(
@@ -224,7 +224,7 @@ def proofread_api():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": received_text}
             ],
-            model=CHAT_MODEL,
+            model="google/gemma-2-9b-it:free",
         )
 
         if chat_completion.choices and chat_completion.choices[0].message:
@@ -264,7 +264,7 @@ def thesaurus_api():
         return jsonify({"error": "キーワードを一つだけ入力してください。"}), 400
 
     # 類語提案用のシステムプロンプト
-    system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、同じ意味や似た意味を持つ語彙を3つ提案してください。それぞれの語彙について、どのような場面で使うのが適切か、また他の候補とのニュアンスの違いなどを分かりやすく簡潔に解説してください。"
+    system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、類語や言い換え表現を3つ提案し、それぞれの違いが明確にわかるように解説してください。\n\n# 出力形式:\n- 提案する語彙ごとに見出しを付けてください。\n- それぞれの語彙について、「ニュアンス」と「使用例」を具体的に説明してください。\n- 全体を300字程度にまとめてください。"
 
     try:
         chat_completion = client.chat.completions.create(
@@ -272,7 +272,7 @@ def thesaurus_api():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"「{received_text}」の類語を解説付きで教えてください。"}
             ],
-            model=CHAT_MODEL,
+            model="google/gemma-2-9b-it:free",
         )
 
         if chat_completion.choices and chat_completion.choices[0].message:
