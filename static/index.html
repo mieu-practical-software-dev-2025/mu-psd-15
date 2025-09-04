@@ -18,7 +18,7 @@
         <a href="/history" class="d-block mb-3">生成履歴を見る</a>
 
         <div class="mb-3">
-            <label for="inputText" class="form-label">キーワードをいくつか入力して（カンマやスペースで区切ってください）、物語のプロットを生成しよう！</label>
+            <label for="inputText" class="form-label">キーワードをいくつか入力して（ 「、」やスペースで区切っでください）、物語のプロットを生成しよう！</label>
             <textarea id="inputText" class="form-control" rows="5" v-model="inputText" placeholder="ここにキーワードを入力..."></textarea>
         </div>
 
@@ -37,11 +37,12 @@
 
         <h3 class="mb-3">登場人物の名前を作成</h3>
         <div class="mb-3">
-            <label for="nameKeyword" class="form-label">苗字または名前に含みたい漢字をいくつか入力してください。</label>
-            <input type="text" id="nameKeyword" class="form-control" v-model="nameKeyword" placeholder="例: 月, 桜, 静">
+            <label for="nameKeyword" class="form-label">名前に含みたい漢字をひとつ入力してください。</label>
+            <input type="text" id="nameKeyword" class="form-control" v-model="nameKeyword" placeholder="例: 月">
         </div>
         <div class="mb-3">
-            <button @click="generateName" class="btn btn-info" :disabled="nameLoading">名前を生成</button>
+            <button @click="generateName('surname')" class="btn btn-info" :disabled="nameLoading">苗字に含めて生成</button>
+            <button @click="generateName('given_name')" class="btn btn-info ms-2" :disabled="nameLoading">名前に含めて生成</button>
         </div>
         <div class="mt-3">
             <div v-if="nameLoading" class="spinner-border text-info" role="status"><span class="visually-hidden">Loading...</span></div>
@@ -102,14 +103,14 @@
                     }
                 },
                 generatePlot() {
-                    this.sendPlotRequest("あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを短く作ってください。また、300字以内で書いてください。");
+                    this.sendPlotRequest("あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを、短く300字以内で書いてください。");
                 },
                 generatePlotKansai() {
                     this.sendPlotRequest("あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを、コメディ風に面白く短く、300字以内で書いてください。");
                 },
                 // 名前生成のリクエストを送信するメソッド
-                async generateName() {
-                    if (!this.nameKeyword.trim()) {
+                async generateName(type) {
+                    if (!this.nameKeyword.trim() || this.nameKeyword.includes(' ')) {
                         this.nameError = '含めたい漢字を入力してください。';
                         return;
                     }
@@ -121,7 +122,7 @@
                         const response = await fetch('/api/generate_name', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ text: this.nameKeyword })
+                            body: JSON.stringify({ text: this.nameKeyword, type: type })
                         });
                         const data = await response.json();
                         if (!response.ok) { throw new Error(data.error || 'サーバーエラー'); }

@@ -105,7 +105,7 @@ def send_api():
         return jsonify({"error": "キーワード（『、』やスペースで区切ったもの）を10個以内で入力してください。"}), 400
     
     # contextがあればsystemプロンプトに設定、なければデフォルト値
-    system_prompt = "あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを短く作ってください。また、300字以内で書いてください。" # デフォルトのシステムプロンプト
+    #system_prompt = "あなたは素晴らしい小説家です。ユーザーからの入力に対して、それらに関連する物語のプロットを短く、300字以内で作ってください。" # デフォルトのシステムプロンプト
     if 'context' in data and data['context'] and data['context'].strip():
         system_prompt = data['context'].strip()
         app.logger.info(f"Using custom system prompt from context: {system_prompt}")
@@ -157,14 +157,28 @@ def generate_name_api():
         app.logger.error("Received text for name generation is empty.")
         return jsonify({"error": "Input text cannot be empty"}), 400
 
+    # 入力が1つのキーワードであるかチェック
+    # スペースやカンマで分割し、単語数を数える
+    word_count = len(received_text.replace('、', ' ').replace(',', ' ').split())
+    if word_count > 1:
+        return jsonify({"error": "キーワードを一つだけ入力してください。"}), 400
+
+    # 'type'フィールド（'surname' or 'given_name'）を取得
+    generation_type = data.get('type', 'surname') # デフォルトは 'surname'
+
     # 名前生成用のシステムプロンプト
-    system_prompt = f"あなたはクリエイティブな名前作成アシスタントです。ユーザーから提供された漢字「{received_text}」を苗字または名前に含んだ、ユニークで魅力的なフルネームの候補を5つ提案してください。箇条書きで、名前のみをリストアップしてください。"
+    if generation_type == 'surname':
+        system_prompt = f"あなたはクリエイティブな名前作成アシスタントです。ユーザーから提供された漢字「{received_text}」を苗字に含んだフルネームの候補を5つ提案してください。箇条書きで、名前の由来も簡潔に説明してください。"
+        history_user_text = f"「{received_text}」を苗字に含む名前"
+    else: # 'given_name'
+        system_prompt = f"あなたはクリエイティブな名前作成アシスタントです。ユーザーから提供された漢字「{received_text}」を名前に含んだフルネームの候補を5つ提案してください。箇条書きで、名前の由来も簡潔に説明してください。"
+        history_user_text = f"「{received_text}」を名前に含む名前"
 
     try:
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"「{received_text}」を含む名前を5つ考えてください。"}
+                {"role": "user", "content": f"「{received_text}」を含む名前を提案してください。"}
             ],
             model=CHAT_MODEL,
         )
@@ -175,7 +189,7 @@ def generate_name_api():
             processed_text = "AIから有効な応答がありませんでした。"
 
         # 正常に取得できたら履歴に追加
-        history_log.append({"user": f"「{received_text}」を含む名前", "ai": processed_text})
+        history_log.append({"user": history_user_text, "ai": processed_text})
 
         return jsonify({"message": "名前が生成されました。", "processed_text": processed_text})
 
@@ -201,6 +215,7 @@ def proofread_api():
         return jsonify({"error": "校正する文章を入力してください。"}), 400
 
     # 校正用のシステムプロンプト
+    # 文字数制限した方がいいかも
     system_prompt = "あなたは優秀な編集者です。以下の文章を、誤字脱字の修正、文法の改善、より自然で分かりやすい表現への変更など、総合的に校正してください。校正後の文章のみを出力してください。"
 
     try:
@@ -241,6 +256,12 @@ def thesaurus_api():
     if not received_text.strip():
         app.logger.error("Received text for thesaurus is empty.")
         return jsonify({"error": "キーワードを入力してください。"}), 400
+
+    # 入力が1つのキーワードであるかチェック
+    # スペースやカンマで分割し、単語数を数える
+    word_count = len(received_text.replace('、', ' ').replace(',', ' ').split())
+    if word_count > 1:
+        return jsonify({"error": "キーワードを一つだけ入力してください。"}), 400
 
     # 類語提案用のシステムプロンプト
     system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、同じ意味や似た意味を持つ語彙を3つ提案してください。それぞれの語彙について、どのような場面で使うのが適切か、また他の候補とのニュアンスの違いなどを分かりやすく簡潔に解説してください。"
