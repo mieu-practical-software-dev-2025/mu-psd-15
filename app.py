@@ -134,6 +134,50 @@ def send_api():
         # クライアントには具体的なエラー詳細を返しすぎないように注意
         return jsonify({"error": f"AIサービスとの通信中にエラーが発生しました。"}), 500
 
+# URL:/api/generate_name に対するメソッドを定義
+@app.route('/api/generate_name', methods=['POST'])
+def generate_name_api():
+    if not client:
+        app.logger.error("OpenRouter API key not configured.")
+        return jsonify({"error": "OpenRouter API key is not configured on the server."}), 500
+
+    data = request.get_json()
+    if not data or 'text' not in data:
+        app.logger.error("Request JSON is missing or does not contain 'text' field.")
+        return jsonify({"error": "Missing 'text' in request body"}), 400
+
+    received_text = data['text']
+    if not received_text.strip():
+        app.logger.error("Received text for name generation is empty.")
+        return jsonify({"error": "Input text cannot be empty"}), 400
+
+    # 名前生成用のシステムプロンプト
+    system_prompt = f"あなたはクリエイティブな名前作成アシスタントです。ユーザーから提供された漢字「{received_text}」を苗字または名前に含んだ、ユニークで魅力的なフルネームの候補を5つ提案してください。箇条書きで、名前のみをリストアップしてください。"
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"「{received_text}」を含む名前を5つ考えてください。"}
+            ],
+            model=CHAT_MODEL,
+        )
+
+        if chat_completion.choices and chat_completion.choices[0].message:
+            processed_text = chat_completion.choices[0].message.content
+        else:
+            processed_text = "AIから有効な応答がありませんでした。"
+
+        # 正常に取得できたら履歴に追加
+        history_log.append({"user": f"「{received_text}」を含む名前", "ai": processed_text})
+
+        return jsonify({"message": "名前が生成されました。", "processed_text": processed_text})
+
+    except Exception as e:
+        app.logger.error(f"OpenRouter API call for name generation failed: {e}")
+        return jsonify({"error": "AIサービスとの通信中にエラーが発生しました。"}), 500
+
+
 # スクリプトが直接実行された場合にのみ開発サーバーを起動
 if __name__ == '__main__':
     if not OPENROUTER_API_KEY:
