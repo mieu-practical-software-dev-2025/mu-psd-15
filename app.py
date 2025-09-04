@@ -65,6 +65,12 @@ def history_page():
     # staticフォルダに history.html を作成する必要があります
     return send_from_directory(app.static_folder, 'history.html')
 
+# URL:/proofread に対して、校正画面(proofread.html)を表示
+@app.route('/proofread')
+def proofread_page():
+    # staticフォルダに proofread.html を作成する必要があります
+    return send_from_directory(app.static_folder, 'proofread.html')
+
 # URL:/api/history で履歴データをJSONとして返す
 @app.route('/api/history', methods=['GET'])
 def get_history():
@@ -175,6 +181,90 @@ def generate_name_api():
 
     except Exception as e:
         app.logger.error(f"OpenRouter API call for name generation failed: {e}")
+        return jsonify({"error": "AIサービスとの通信中にエラーが発生しました。"}), 500
+
+# URL:/api/proofread に対するメソッドを定義
+@app.route('/api/proofread', methods=['POST'])
+def proofread_api():
+    if not client:
+        app.logger.error("OpenRouter API key not configured.")
+        return jsonify({"error": "OpenRouter API key is not configured on the server."}), 500
+
+    data = request.get_json()
+    if not data or 'text' not in data:
+        app.logger.error("Request JSON is missing or does not contain 'text' field.")
+        return jsonify({"error": "Missing 'text' in request body"}), 400
+
+    received_text = data['text']
+    if not received_text.strip():
+        app.logger.error("Received text for proofreading is empty.")
+        return jsonify({"error": "校正する文章を入力してください。"}), 400
+
+    # 校正用のシステムプロンプト
+    system_prompt = "あなたは優秀な編集者です。以下の文章を、誤字脱字の修正、文法の改善、より自然で分かりやすい表現への変更など、総合的に校正してください。校正後の文章のみを出力してください。"
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": received_text}
+            ],
+            model=CHAT_MODEL,
+        )
+
+        if chat_completion.choices and chat_completion.choices[0].message:
+            processed_text = chat_completion.choices[0].message.content
+            # 正常に取得できたら履歴に追加
+            history_log.append({"user": f"【校正依頼】\n{received_text}", "ai": f"【校正結果】\n{processed_text}"})
+        else:
+            processed_text = "AIから有効な応答がありませんでした。"
+
+        return jsonify({"message": "文章が校正されました。", "processed_text": processed_text})
+
+    except Exception as e:
+        app.logger.error(f"OpenRouter API call for proofreading failed: {e}")
+        return jsonify({"error": "AIサービスとの通信中にエラーが発生しました。"}), 500
+
+# URL:/api/thesaurus に対するメソッドを定義
+@app.route('/api/thesaurus', methods=['POST'])
+def thesaurus_api():
+    if not client:
+        app.logger.error("OpenRouter API key not configured.")
+        return jsonify({"error": "OpenRouter API key is not configured on the server."}), 500
+
+    data = request.get_json()
+    if not data or 'text' not in data:
+        app.logger.error("Request JSON is missing or does not contain 'text' field.")
+        return jsonify({"error": "Missing 'text' in request body"}), 400
+
+    received_text = data['text']
+    if not received_text.strip():
+        app.logger.error("Received text for thesaurus is empty.")
+        return jsonify({"error": "キーワードを入力してください。"}), 400
+
+    # 類語提案用のシステムプロンプト
+    system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、同じ意味や似た意味を持つ語彙を3つ提案してください。それぞれの語彙について、どのような場面で使うのが適切か、また他の候補とのニュアンスの違いなどを分かりやすく簡潔に解説してください。"
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"「{received_text}」の類語を解説付きで教えてください。"}
+            ],
+            model=CHAT_MODEL,
+        )
+
+        if chat_completion.choices and chat_completion.choices[0].message:
+            processed_text = chat_completion.choices[0].message.content
+            # 正常に取得できたら履歴に追加
+            history_log.append({"user": f"【類語検索】\n{received_text}", "ai": f"【類語解説】\n{processed_text}"})
+        else:
+            processed_text = "AIから有効な応答がありませんでした。"
+
+        return jsonify({"message": "類語が生成されました。", "processed_text": processed_text})
+
+    except Exception as e:
+        app.logger.error(f"OpenRouter API call for thesaurus failed: {e}")
         return jsonify({"error": "AIサービスとの通信中にエラーが発生しました。"}), 500
 
 
