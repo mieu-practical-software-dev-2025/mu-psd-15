@@ -215,8 +215,8 @@ def proofread_api():
         app.logger.error(f"Input text for proofreading is too long: {len(received_text)} characters.")
         return jsonify({"error": "入力できる文字数は500文字までです。"}), 400
 
-    # 校正用のシステムプロンプト
-    system_prompt = "あなたは優秀な編集者です。以下の文章を、誤字脱字の修正、文法的な誤りの訂正、句読点の適切な使用、より自然で分かりやすい表現への改善など、総合的に校正してください。\n\n# 指示:\n- 元の文章の意図やニュアンスを最大限尊重してください。\n- 校正後の文章のみを出力し、解説や前置きは一切含めないでください。"
+    # 描写を具体化するためのシステムプロンプト
+    system_prompt = "あなたはプロの小説家です。以下のユーザーが入力した短い文章を、情景が目に浮かぶような、豊かで具体的な小説の描写に書き換えてください。\n\n# 指示:\n- 元の文章の核となる意味は変えずに、五感を刺激するような言葉（視覚、聴覚、嗅覚、触覚、味覚）や登場人物の感情を加えてください。\n- 変換後の文章のみを出力し、解説や前置きは一切含めないでください。"
 
     try:
         chat_completion = client.chat.completions.create(
@@ -230,11 +230,11 @@ def proofread_api():
         if chat_completion.choices and chat_completion.choices[0].message:
             processed_text = chat_completion.choices[0].message.content
             # 正常に取得できたら履歴に追加
-            history_log.append({"user": f"【校正依頼】\n{received_text}", "ai": f"【校正結果】\n{processed_text}"})
+            history_log.append({"user": f"【描写の元文章】\n{received_text}", "ai": f"【生成された描写】\n{processed_text}"})
         else:
             processed_text = "AIから有効な応答がありませんでした。"
 
-        return jsonify({"message": "文章が校正されました。", "processed_text": processed_text})
+        return jsonify({"message": "文章が変換されました。", "processed_text": processed_text})
 
     except Exception as e:
         app.logger.error(f"OpenRouter API call for proofreading failed: {e}")
@@ -264,7 +264,7 @@ def thesaurus_api():
         return jsonify({"error": "キーワードを一つだけ入力してください。"}), 400
 
     # 類語提案用のシステムプロンプト
-    system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、類語や言い換え表現を3つ提案し、それぞれの違いが明確にわかるように解説してください。\n\n# 出力形式:\n- 提案する語彙ごとに見出しを付けてください。\n- それぞれの語彙について、「ニュアンス」と「使用例」を具体的に説明してください。\n- 全体を300字程度にまとめてください。"
+    system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、類語や言い換え表現を3つ提案し、それぞれの違いが明確にわかるように解説してください。\n\n# 出力形式:\n- 提案する語彙ごとに見出しを付けてください。\n- それぞれの語彙について、「ニュアンス」と「使用例」を具体的に説明してください。\n- 全体を300字程度にまとめてください。\n- 類語や言い換え表現は日本語で提案してください。"
 
     try:
         chat_completion = client.chat.completions.create(
