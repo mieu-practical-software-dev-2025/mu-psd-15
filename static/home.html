@@ -6,30 +6,60 @@
     <title>創作支援AI - Writer's Desk</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f8f9fa;
-        }
-        .container {
-            text-align: center;
-        }
-        .btn {
-            margin: 10px;
-            min-width: 220px;
+        body { background-color: #f8f9fa; }
+        .card { transition: transform 0.2s ease-in-out; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card-title { color: #0d6efd; }
+        .card-title.text-info { color: #0dcaf0 !important; }
+        .card-title.text-secondary { color: #6c757d !important; }
+        .hero {
+            background: linear-gradient(to right, #007bff, #0dcaf0);
+            color: white;
+            padding: 4rem 0;
+            margin-bottom: 3rem;
         }
     </style>
 </head>
 <body>
+    <div class="hero text-center">
+        <div class="container">
+            <h1 class="display-4">創作支援AI - Writer's Desk</h1>
+            <p class="lead">AIがあなたの創作活動をサポートします。<br>物語のアイデア出しから、文章のブラッシュアップまで、執筆のあらゆる場面でご活用ください。</p>
+        </div>
+    </div>
+
     <div class="container">
-        <h1 class="mb-5">創作支援AI - Writer's Desk</h1>
-        <p class="lead mb-5">AIがあなたの創作活動をサポートします。<br>物語のアイデア出しから、文章のブラッシュアップまで、執筆のあらゆる場面でご活用ください。</p>
-        <div class="d-grid gap-3 col-md-6 mx-auto">
-            <a href="/plot" class="btn btn-primary btn-lg">物語のあらすじと登場人物を考える</a>
-            <a href="/proofread" class="btn btn-info btn-lg">文章の表現を豊かにする</a>
-            <a href="/history" class="btn btn-outline-secondary btn-lg">履歴を見る</a>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <a href="/plot" class="text-decoration-none">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h3 class="card-title">物語の創造</h3>
+                            <p class="card-text">キーワードから物語のあらすじや登場人物の名前を生成します。アイデアの種を見つけましょう。</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="/proofread" class="text-decoration-none">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h3 class="card-title text-info">文章の洗練</h3>
+                            <p class="card-text">文章の描写を豊かにしたり、最適な言葉（類語）を見つけたりして、表現を磨き上げます。</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="/history" class="text-decoration-none">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h3 class="card-title text-secondary">生成履歴</h3>
+                            <p class="card-text">過去にAIが生成したテキストをいつでも確認できます。</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
         </div>
     </div>
 </body>
