@@ -1,9 +1,42 @@
 # Webアプリ仕様書
 
 ## 1. 概要
-本アプリケーションは、小説などの創作活動を支援するためのWebアプリケーション「**Writer's Desk**」である。
+本アプリケーションは、小説などの創作活動を支援するためのWebアプリケーション「**Writer's Desk**」である。  
 物語のアイデア出しから、登場人物の名前作成、文章表現の改善まで、執筆の様々な場面でAIによるサポートを提供する。
 
+### 1.1 システムの概要説明
+キーワード入力でたくさん入力したらエラーが出るようにする。
+そのため、物語のプロット出力はキーワード入力を10個まで、名前生成はキーワード3つまで、類語検索はひとつだけ、描写の具体化は100文字まで、と入力制限を設ける。
+ 
+### 1.2 システム構成図
+
+```mermaid
+graph TD
+    subgraph "ユーザー環境"
+        User[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/user.svg" width="30" /> ユーザー]
+        Browser[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/brands/chrome.svg" width="30" /> ブラウザ]
+    end
+
+    subgraph "Webサーバー (Flask)"
+        Flask[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/server.svg" width="30" /> app.py] 
+        StaticFiles[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/file-code.svg" width="30" /> 静的ファイル<br>(HTML/Vue.js)]
+        HistoryFile[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/file-lines.svg" width="30" /> history.json]
+    end
+
+    subgraph "外部サービス"
+        OpenRouter[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/brain.svg" width="30" /> OpenRouter API]
+    end
+
+    User --> Browser
+    Browser -- "1. ページ表示リクエスト<br>(/, /plot, etc.)" --> Flask
+    Flask -- "2. 静的ファイル返却" --> StaticFiles
+    StaticFiles --> Browser
+    Browser -- "3. APIリクエスト<br>(/api/..., Fetch API)" --> Flask
+    Flask -- "4. APIリクエスト<br>(プロンプト送信)" --> OpenRouter
+    OpenRouter -- "5. AIによる生成結果" --> Flask
+    Flask -- "履歴の読み書き" <--> HistoryFile
+    Flask -- "6. JSONレスポンス" --> Browser
+```
 
 ## 2. 主な機能
 
@@ -19,8 +52,9 @@
   - ユーザーが入力した複数のキーワードを元に、物語のあらすじを生成する。
   - 通常のプロット生成と、コメディ風のプロット生成の2つのモードを持つ。
 - **登場人物の名前作成機能**
-  - ユーザーが指定した漢字一文字を「苗字」または「名前」に含んだフルネームの候補を5つ提案する。
-  - 各候補には、名前の雰囲気や由来に関する簡単な説明が付与される。
+  - ユーザーが指定した漢字（3つまで）をフルネームのどこかに含んだ、キャラクター名の候補を5つ提案する。
+  - 「日本人名（漢字）」と「外国人名（カタカナ）」の生成モードを切り替えられる。外国人名モードでは、響きやイメージのキーワードから名前を生成する。
+  - 各候補には、名前が持つ雰囲気や由来に関する簡単な説明が付与される。
 
 ### 2.3 文章表現支援画面 (`/proofread`)
 - **類語・言い換え検索機能**
@@ -30,7 +64,10 @@
 
 ### 2.4 生成履歴画面 (`/history`)
 - すべてのAI生成機能の利用履歴（ユーザー入力とAIの応答）を時系列で一覧表示する。
-- 履歴はサーバーのメモリ上に保存され、サーバー再起動時にリセットされる。
+- 履歴はサーバー上のファイル(`history.json`)に永続的に保存される。
+- 各履歴をお気に入りに登録する機能を持つ。
+- 「お気に入りのみ表示」で履歴を絞り込むことができる。
+- 全ての履歴を一括で削除する機能を持つ。
 
 ### 2.5 バックエンドAPI
 - 各機能に対応するAPIエンドポイントを提供する。
@@ -39,18 +76,20 @@
   - `/api/proofread`: 描写の具体化
   - `/api/thesaurus`: 類語検索
   - `/api/history`: 履歴データの提供
+  - `/api/history/toggle_favorite/<item_id>`: 履歴のお気に入り状態を切り替え
+  - `/api/history/clear`: 全履歴を削除
 - ユーザー入力と各機能専用のシステムプロンプトを合成し、OpenRouter APIへリクエストを送信する。
 - 応答をJSON形式でフロントエンドに返す。
 
 ## 3. 使用技術
 
-| 分類         | 技術・ライブラリ |
+| 分類 | 技術・ライブラリ |
 |--------------|------------------|
 | フロントエンド | HTML5, CSS3, Vue.js (CDN), Bootstrap |
 | バックエンド | Python, Flask |
 | 通信方式     | Fetch API / JSON |
 | AIバックエンド | OpenRouter API |
-
+| Pythonライブラリ | Flask, python-dotenv, openai |
 
 ## 4. 入出力例
 
@@ -60,11 +99,11 @@
 - **出力例**: `春の訪れを告げる桜の花びらが舞い落ちる川辺で、幼なじみの紬と遥は久しぶりに再会する。子どもの頃に交わした「大人になったらまたここで会おう」という約束を思い出しながら、二人はそれぞれの“幸せ”を川のせせらぎとともに分かち合う。`
 
 ### 4.2 名前生成
-- **ユーザー入力**: `月` (タイプ: 苗字)
-- **付与コンテキスト**: `あなたはプロの作家です。指定された漢字「月」を【苗字】に含んだ、フルネームのキャラクター名を5つ提案してください...`
+- **ユーザー入力 (日本人名モード)**: `月、桜`
+- **付与コンテキスト**: `あなたはプロの作家です。指定された漢字「月、桜」をフルネームのどこかに含んだ、日本のキャラクター名を5つ提案してください...`
 - **出力例**:
-  - `月詠 光（つくよみ ひかる） - 神秘的で古風な響きを持つ名前。`
-  - `望月 蒼（もちづき あおい） - 爽やかで知的な印象を与える名前。`
+  - `- 月島 桜（つきしま さくら） - 明るく活発、春のような笑顔が魅力的な現代少女。`
+  - `- 桜月 凛（さくらずき りん） - 静かで美しい、月明かりに照らされた桜を連想させる。`
 
 ### 4.3 描写の具体化
 - **ユーザー入力**: `男が部屋に入ってきた`

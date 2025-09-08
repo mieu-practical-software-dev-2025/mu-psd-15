@@ -29,8 +29,10 @@
     </div>
 
     <div class="container">
-        <div class="row g-4">
-            <div class="col-md-4">
+        <!-- d-flexとflex-columnで要素を縦に並べ、align-items-centerで中央揃えにします -->
+        <div class="d-flex flex-column align-items-center">
+            <!-- 各カードの幅をcol-md-6で指定し、大きくなりすぎないように調整します -->
+            <div class="col-12 col-md-6 mb-4">
                 <a href="/plot" class="text-decoration-none">
                     <div class="card h-100">
                         <div class="card-body text-center">
@@ -40,7 +42,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-6 mb-4">
                 <a href="/proofread" class="text-decoration-none">
                     <div class="card h-100">
                         <div class="card-body text-center">
@@ -50,12 +52,12 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-6 mb-4">
                 <a href="/history" class="text-decoration-none">
                     <div class="card h-100">
                         <div class="card-body text-center">
                             <h3 class="card-title text-secondary">生成履歴</h3>
-                            <p class="card-text">過去にAIが生成したテキストをいつでも確認できます。</p>
+                            <p class="card-text">過去にAIが生成したテキストをいつでも確認できます。お気に入り機能で大切なアイデアを保存しましょう。</p>
                         </div>
                     </div>
                 </a>

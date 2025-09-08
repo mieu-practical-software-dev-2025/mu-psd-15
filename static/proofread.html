@@ -37,7 +37,10 @@
                     <button @click="findThesaurus" class="btn btn-info" :disabled="thesaurusLoading">類語を探す</button>
                 </div>
                 
-                <div v-if="thesaurusLoading" class="d-flex justify-content-center my-3"><div class="spinner-border text-info" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                <div v-if="thesaurusLoading" class="d-flex justify-content-center align-items-center my-3 text-info">
+                    <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
+                    <strong>処理中・・・</strong>
+                </div>
                 <div v-if="thesaurusError" class="alert alert-danger mt-3">{{ thesaurusError }}</div>
                 <div v-if="thesaurusResult" class="alert alert-light border mt-3" style="white-space: pre-wrap;">{{ thesaurusResult }}</div>
             </div>
@@ -48,7 +51,7 @@
                 <h2 class="card-title mb-3">描写を具体化する</h2>
                 <p class="card-subtitle mb-3 text-muted">短い文章を入力すると、AIが五感や感情の表現を加えて、情景が目に浮かぶような豊かな描写に書き換えます。</p>
                 <div class="mb-3">
-                    <label for="inputText" class="form-label">文章(100字以内)を入力してください。</label>
+                    <label for="inputText" class="form-label">文章（100字以内）を入力してください。</label>
                     <textarea id="inputText" class="form-control" rows="4" v-model="inputText" placeholder="例：男が部屋に入ってきた"></textarea>
                 </div>
 
@@ -56,7 +59,10 @@
                     <button @click="proofreadText" class="btn btn-primary" :disabled="loading">描写を生成</button>
                 </div>
 
-                <div v-if="loading" class="d-flex justify-content-center my-3"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                <div v-if="loading" class="d-flex justify-content-center align-items-center my-3 text-primary">
+                    <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
+                    <strong>処理中・・・</strong>
+                </div>
                 <div v-if="error" class="alert alert-danger mt-3">{{ error }}</div>
                 <div v-if="processedText" class="position-relative">
                     <div class="alert alert-success mt-3" style="white-space: pre-wrap;">{{ processedText }}</div>

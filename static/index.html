@@ -42,7 +42,10 @@
                     <button @click="generatePlotKansai" class="btn btn-success ms-2" :disabled="loading">コメディ風で生成</button>
                 </div>
                 
-                <div v-if="loading" class="d-flex justify-content-center my-3"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                <div v-if="loading" class="d-flex justify-content-center align-items-center my-3 text-primary">
+                    <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
+                    <strong>処理中・・・</strong>
+                </div>
                 <div v-if="error" class="alert alert-danger mt-3">{{ error }}</div>
                 <div v-if="processedText" class="alert alert-success mt-3" style="white-space: pre-wrap;">{{ processedText }}</div>
             </div>
@@ -50,18 +53,32 @@
 
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title mb-3">登場人物の名前を作成</h2>
-                <p class="card-subtitle mb-3 text-muted">物語に登場させたいキャラクターの、名前に使いたい漢字を入れるだけで、AIがフルネームの候補を提案します。</p>
+                <h2 class="card-title mb-3">登場人物の名前を作成する</h2>
+                <p class="card-subtitle mb-3 text-muted">物語に登場させたいキャラクターの、名前に使いたい文字を入れるだけで、AIがフルネームの候補を提案します。</p>
 
                 <div class="mb-3">
-                    <label for="nameKeyword" class="form-label">名前に含みたい漢字を3つ（ 「、」やスペースで区切ってください）まで入力してください。</label>
-                    <input type="text" id="nameKeyword" class="form-control" v-model="nameKeyword" placeholder="例: 月、桜">
+                    <label class="form-label">生成する名前のタイプを選択してください。</label>
+                    <br>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" id="nameTypeJapanese" value="japanese" v-model="nameType">
+                        <label class="form-check-label" for="nameTypeJapanese">日本人名 (漢字)</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" id="nameTypeForeign" value="foreign" v-model="nameType">
+                        <label class="form-check-label" for="nameTypeForeign">外国人名 (カタカナ)</label>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="nameKeyword" class="form-control" v-model="nameKeyword" :placeholder="namePlaceholder">
                 </div>
                 <div class="mb-3">
                     <button @click="generateName" class="btn btn-info" :disabled="nameLoading">名前を生成</button>
                 </div>
 
-                <div v-if="nameLoading" class="d-flex justify-content-center my-3"><div class="spinner-border text-info" role="status"><span class="visually-hidden">Loading...</span></div></div>
+                <div v-if="nameLoading" class="d-flex justify-content-center align-items-center my-3 text-info">
+                    <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
+                    <strong>処理中・・・</strong>
+                </div>
                 <div v-if="nameError" class="alert alert-danger mt-3">{{ nameError }}</div>
                 <div v-if="nameResult" class="alert alert-light border mt-3" style="white-space: pre-wrap;">{{ nameResult }}</div>
             </div>
@@ -82,8 +99,18 @@
                     nameKeyword: '',
                     nameResult: '',
                     nameLoading: false,
-                    nameError: ''
+                    nameError: '',
+                    nameType: 'japanese' // 'japanese' or 'foreign'
                 };
+            },
+            computed: {
+                namePlaceholder() {
+                    if (this.nameType === 'japanese') {
+                        return '名前に含めたい漢字を入力 (例: 月、桜)';
+                    } else {
+                        return '名前の響きやイメージを入力 (例: アレク、光)';
+                    }
+                }
             },
             methods: {
                 // プロット生成のリクエストを送信するメソッド
@@ -126,8 +153,8 @@
                 },
                 // 名前生成のリクエストを送信するメソッド
                 async generateName() {
-                    if (!this.nameKeyword.trim() || this.nameKeyword.includes(' ')) {
-                        this.nameError = '含めたい漢字を入力してください。';
+                    if (!this.nameKeyword.trim()) {
+                        this.nameError = 'キーワードを入力してください。';
                         return;
                     }
                     this.nameLoading = true;
@@ -138,7 +165,10 @@
                         const response = await fetch('/api/generate_name', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ text: this.nameKeyword })
+                            body: JSON.stringify({ 
+                                text: this.nameKeyword,
+                                mode: this.nameType 
+                            })
                         });
                         const data = await response.json();
                         if (!response.ok) { throw new Error(data.error || 'サーバーエラー'); }

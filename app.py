@@ -3,6 +3,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from openai import OpenAI # Import the OpenAI library
 from dotenv import load_dotenv
 from functools import wraps
+import json # ファイルI/Oのために追加
+import uuid # ユニークIDを生成するために追加
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -12,10 +14,22 @@ load_dotenv()
 # このファイルと同じ階層に 'static' フォルダがあれば自動的にそこが使われます。
 app = Flask(__name__)
 
-# 履歴を保存するためのリスト（サーバーのメモリ上に保存）
-# 注: サーバーを再起動すると履歴は失われます。
-history_log = []
+# --- 履歴のファイル永続化 ---
+HISTORY_FILE = "history.json"
 
+def load_history():
+    """起動時にファイルから履歴を読み込む"""
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
+
+def save_history(history_data):
+    """履歴が更新されるたびにファイルに保存する"""
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(history_data, f, ensure_ascii=False, indent=4)
+
+history_log = load_history()
 
 # 開発モード時に静的ファイルのキャッシュを無効にする
 if app.debug:
@@ -92,7 +106,13 @@ def call_openrouter_api(system_prompt, user_prompt, history_entry):
         if chat_completion.choices and chat_completion.choices[0].message:
             processed_text = chat_completion.choices[0].message.content
             # 正常に取得できたら履歴に追加
-            history_log.append({"user": history_entry, "ai": processed_text})
+            history_log.append({
+                "id": str(uuid.uuid4()), # ユニークなIDを生成
+                "user": history_entry, 
+                "ai": processed_text,
+                "favorite": False # デフォルトはお気に入りではない
+            })
+            save_history(history_log) # 履歴をファイルに保存
             return jsonify({"message": "Success", "processed_text": processed_text})
         else:
             return jsonify({"error": "AIから有効な応答がありませんでした。"}), 500
@@ -125,7 +145,22 @@ def proofread_page():
 @app.route('/api/history', methods=['GET'])
 def get_history():
     return jsonify(history_log)
-    
+
+# URL:/api/history/toggle_favorite/<item_id> でお気に入り状態を切り替える
+@app.route('/api/history/toggle_favorite/<item_id>', methods=['POST'])
+def toggle_favorite(item_id):
+    item_found = False
+    for item in history_log:
+        if item.get('id') == item_id:
+            item['favorite'] = not item.get('favorite', False)
+            item_found = True
+            save_history(history_log) # 変更をファイルに保存
+            break
+    if item_found:
+        return jsonify({"message": "Favorite status toggled successfully."})
+    else:
+        return jsonify({"error": "Item not found."}), 404
+
 # URL:/send_api に対するメソッドを定義
 @app.route('/send_api', methods=['POST'])
 @api_endpoint
@@ -146,17 +181,32 @@ def send_api(data):
 @api_endpoint
 def generate_name_api(data):
     received_text = data['text'].strip()
-    # 入力がキーワード群か（長すぎる文章でないか）を簡易的にチェック
-    word_count = len(received_text.replace('、', ' ').split())
-    if word_count > 3: 
-        app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
-        return jsonify({"error": "漢字(『、』やスペースで区切ったもの)を3個以内で入力してください。"}), 400
-    
-    # 名前生成用のシステムプロンプト
-    system_prompt = f"あなたはプロの作家です。指定された漢字「{received_text}」をフルネームのどこかに含んだ、キャラクター名を5つ提案してください。\n\n# 制約条件:\n- 提案は箇条書き（-）で記述してください。\n- それぞれの名前の横に、その名前が持つ雰囲気や由来を20字程度で簡潔に添えてください。"
-    history_user_text = f"「{received_text}」を含む名前"
+    mode = data.get('mode', 'japanese') # デフォルトは日本人名
 
-    user_prompt = f"「{received_text}」を含む名前を提案してください。"
+    if mode == 'japanese':
+        # 日本人名生成のロジック
+        word_count = len(received_text.replace('、', ' ').split())
+        if word_count > 3: 
+            app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
+            return jsonify({"error": "漢字( 『、』やスペースで区切ったもの)を3個以内で入力してください。"}), 400
+        
+        system_prompt = f"あなたはプロの作家です。指定された漢字「{received_text}」をフルネームのどこかに含んだ、日本のキャラクター名を5つ提案してください。\n\n# 制約条件:\n- 提案は箇条書き（-）で記述してください。\n- それぞれの名前の横に、その名前が持つ雰囲気や由来を20字程度で簡潔に添えてください。"
+        history_user_text = f"「{received_text}」を含む日本人名"
+        user_prompt = f"「{received_text}」を含む日本人名を提案してください。"
+
+    elif mode == 'foreign':
+        # 外国人名生成のロジック
+        word_count = len(received_text.replace('、', ' ').split())
+        if word_count > 3: 
+            app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
+            return jsonify({"error": "キーワード( 『、』やスペースで区切ったもの)を3個以内で入力してください。"}), 400
+        
+        system_prompt = f"あなたはプロの作家です。指定されたキーワード「{received_text}」のイメージに合う、外国風のキャラクター名をカタカナで5つ提案してください。フルネームでもファーストネームのみでも構いません。\n\n# 制約条件:\n- 提案は箇条書き（-）で記述してください。\n- それぞれの名前の横に、その名前が持つ雰囲気や由来を20字程度で簡潔に添えてください。"
+        history_user_text = f"「{received_text}」のイメージに合う外国人名"
+        user_prompt = f"「{received_text}」のイメージに合う外国人名を提案してください。"
+    else:
+        return jsonify({"error": "無効なモードが指定されました。"}), 400
+
     return call_openrouter_api(system_prompt, user_prompt, history_user_text)
 
 # URL:/api/proofread に対するメソッドを定義
