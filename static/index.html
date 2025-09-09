@@ -42,9 +42,10 @@
                     <button @click="generatePlotKansai" class="btn btn-success ms-2" :disabled="loading">コメディ風で生成</button>
                 </div>
                 
-                <div v-if="loading" class="d-flex justify-content-center align-items-center my-3 text-primary">
-                    <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
-                    <strong>処理中・・・</strong>
+                <div v-if="loading" class="d-flex justify-content-center my-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">読み込み中...</span>
+                    </div>
                 </div>
                 <div v-if="error" class="alert alert-danger mt-3">{{ error }}</div>
                 <div v-if="processedText" class="alert alert-success mt-3" style="white-space: pre-wrap;">{{ processedText }}</div>
@@ -53,12 +54,11 @@
 
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title mb-3">登場人物の名前を作成する</h2>
+                <h2 class="card-title mb-3">登場人物の名前を作成</h2>
                 <p class="card-subtitle mb-3 text-muted">物語に登場させたいキャラクターの、名前に使いたい文字を入れるだけで、AIがフルネームの候補を提案します。</p>
 
                 <div class="mb-3">
-                    <label class="form-label">生成する名前のタイプを選択してください。</label>
-                    <br>
+                    <label class="form-label">生成する名前のタイプを選択してください。</label><br>
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" id="nameTypeJapanese" value="japanese" v-model="nameType">
                         <label class="form-check-label" for="nameTypeJapanese">日本人名 (漢字)</label>
@@ -68,16 +68,17 @@
                         <label class="form-check-label" for="nameTypeForeign">外国人名 (カタカナ)</label>
                     </div>
                 </div>
+
                 <div class="mb-3">
                     <input type="text" id="nameKeyword" class="form-control" v-model="nameKeyword" :placeholder="namePlaceholder">
                 </div>
                 <div class="mb-3">
                     <button @click="generateName" class="btn btn-info" :disabled="nameLoading">名前を生成</button>
                 </div>
-
-                <div v-if="nameLoading" class="d-flex justify-content-center align-items-center my-3 text-info">
-                    <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
-                    <strong>処理中・・・</strong>
+                <div v-if="nameLoading" class="d-flex justify-content-center my-3">
+                    <div class="spinner-border text-info" role="status">
+                        <span class="visually-hidden">読み込み中...</span>
+                    </div>
                 </div>
                 <div v-if="nameError" class="alert alert-danger mt-3">{{ nameError }}</div>
                 <div v-if="nameResult" class="alert alert-light border mt-3" style="white-space: pre-wrap;">{{ nameResult }}</div>
@@ -166,7 +167,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
-                                text: this.nameKeyword,
+                                text: this.nameKeyword, 
                                 mode: this.nameType 
                             })
                         });

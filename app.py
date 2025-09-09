@@ -14,7 +14,7 @@ load_dotenv()
 # このファイルと同じ階層に 'static' フォルダがあれば自動的にそこが使われます。
 app = Flask(__name__)
 
-# --- 履歴のファイル永続化 ---
+# --- 履歴データのファイル永続化関連 ---
 HISTORY_FILE = "history.json"
 
 def load_history():
@@ -29,6 +29,7 @@ def save_history(history_data):
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history_data, f, ensure_ascii=False, indent=4)
 
+# グローバル変数として履歴データを保持
 history_log = load_history()
 
 # 開発モード時に静的ファイルのキャッシュを無効にする
@@ -43,15 +44,15 @@ if app.debug:
         return response
 
 
-# OpenRouter APIキーと関連情報を環境変数から取得
-# このキーはサーバーサイドで安全に管理してください
+# --- OpenRouter APIクライアントの設定 ---
+
+# 環境変数からAPIキーや設定情報を取得
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-SITE_URL = os.getenv("YOUR_SITE_URL", "http://localhost:5000") # Default if not set
-APP_NAME = os.getenv("YOUR_APP_NAME", "FlaskVueApp") # Default if not set
-CHAT_MODEL = os.getenv("CHAT_MODEL", "google/gemma-3-27b-it:free") # Default model
-# OpenAI Clientのインスタンス化
-# アプリケーション起動時に一度だけ実行する
+SITE_URL = os.getenv("YOUR_SITE_URL", "http://localhost:5000") # 未設定の場合のデフォルト値
+APP_NAME = os.getenv("YOUR_APP_NAME", "FlaskVueApp") # 未設定の場合のデフォルト値
+CHAT_MODEL = os.getenv("CHAT_MODEL", "google/gemma-3-27b-it:free") # 未設定の場合のデフォルトモデル
 client = None
+# APIキーが設定されている場合のみ、OpenAIクライアントをインスタンス化
 if OPENROUTER_API_KEY:
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
@@ -67,8 +68,9 @@ if OPENROUTER_API_KEY:
 def api_endpoint(f):
     """
     APIエンドポイントの共通処理をまとめたデコレータ。
-    - APIクライアントの存在チェック
-    - リクエストJSONのパースと'text'フィールドの検証
+    - APIクライアントのセットアップ確認
+    - リクエストがJSON形式であることの確認
+    - JSONデータに'text'フィールドが存在し、空でないことの検証
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -85,7 +87,7 @@ def api_endpoint(f):
         if not received_text:
             app.logger.error("Received text is empty or whitespace.")
             return jsonify({"error": "Input text cannot be empty"}), 400
-        
+         
         # 元の関数にリクエストデータを渡して実行
         return f(data)
     return decorated_function
@@ -121,34 +123,43 @@ def call_openrouter_api(system_prompt, user_prompt, history_entry):
         app.logger.error(f"OpenRouter API call failed: {e}")
         return jsonify({"error": "AIサービスとの通信中にエラーが発生しました。"}), 500
 
-# URL:/ に対して、ホーム画面(home.html)を表示
+# --- ページ表示用のルート定義 ---
+
 @app.route('/')
 def home():
+    app.logger.info("Route '/' called.")
     return send_from_directory(app.static_folder, 'home.html')
 
 # URL:/plot に対して、プロット生成画面(index.html)を表示
 @app.route('/plot')
 def plot_page():
+    app.logger.info("Route '/plot' called.")
     return send_from_directory(app.static_folder, 'index.html')
 
 # URL:/history に対して、履歴画面(history.html)を表示
 @app.route('/history')
 def history_page():
+    app.logger.info("Route '/history' called.")
     return send_from_directory(app.static_folder, 'history.html')
 
 # URL:/profread に対して、文章を豊かにする画面(profread.html)を表示
 @app.route('/proofread')
 def proofread_page():
+    app.logger.info("Route '/proofread' called.")
     return send_from_directory(app.static_folder, 'proofread.html')
 
-# URL:/api/history で履歴データをJSONとして返す
+# --- APIエンドポイントのルート定義 ---
+
+# 履歴データを全件取得するAPI
 @app.route('/api/history', methods=['GET'])
 def get_history():
+    app.logger.info("API '/api/history' called.")
     return jsonify(history_log)
 
 # URL:/api/history/toggle_favorite/<item_id> でお気に入り状態を切り替える
 @app.route('/api/history/toggle_favorite/<item_id>', methods=['POST'])
 def toggle_favorite(item_id):
+    app.logger.info(f"API '/api/history/toggle_favorite/{item_id}' called.")
     item_found = False
     for item in history_log:
         if item.get('id') == item_id:
@@ -157,34 +168,50 @@ def toggle_favorite(item_id):
             save_history(history_log) # 変更をファイルに保存
             break
     if item_found:
+        app.logger.info(f"Toggled favorite for item_id: {item_id}")
         return jsonify({"message": "Favorite status toggled successfully."})
     else:
+        app.logger.warning(f"Item not found for item_id: {item_id}")
         return jsonify({"error": "Item not found."}), 404
 
-# URL:/send_api に対するメソッドを定義
+# 全ての履歴を削除するAPI
+@app.route('/api/history/clear', methods=['POST'])
+def clear_history():
+    app.logger.info("API '/api/history/clear' called.")
+    global history_log
+    history_log.clear() # メモリ上のリストをクリア
+    save_history(history_log) # 空のリストをファイルに保存
+    app.logger.info("History cleared successfully.")
+    return jsonify({"message": "History cleared successfully."})
+
+# 物語のプロットを生成するAPI
 @app.route('/send_api', methods=['POST'])
 @api_endpoint
 def send_api(data):
+    app.logger.info("API '/send_api' called.")
     received_text = data['text'].strip()
     # 入力がキーワード群か（長すぎる文章でないか）を簡易的にチェック
     word_count = len(received_text.replace('、', ' ').split())
     if word_count > 10: # 例えば10単語より多い場合はエラーとする
         app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
-        return jsonify({"error": "キーワード(『、』やスペースで区切ったもの)を10個以内で入力してください。"}), 400
+        return jsonify({"error": "キーワード( 『、』やスペースで区切ったもの)を10個以内で入力してください。"}), 400
     
     # フロントエンドから渡されたcontextをsystemプロンプトとして使用
     system_prompt = data.get('context', '').strip()
-    return call_openrouter_api(system_prompt, received_text, received_text)
+    result = call_openrouter_api(system_prompt, received_text, received_text)
+    app.logger.info("API '/send_api' finished.")
+    return result
 
-# URL:/api/generate_name に対するメソッドを定義
+# 登場人物の名前を生成するAPI
 @app.route('/api/generate_name', methods=['POST'])
 @api_endpoint
 def generate_name_api(data):
+    app.logger.info("API '/api/generate_name' called.")
     received_text = data['text'].strip()
     mode = data.get('mode', 'japanese') # デフォルトは日本人名
 
     if mode == 'japanese':
-        # 日本人名生成のロジック
+        # 日本人名生成用のプロンプト設定
         word_count = len(received_text.replace('、', ' ').split())
         if word_count > 3: 
             app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
@@ -195,7 +222,7 @@ def generate_name_api(data):
         user_prompt = f"「{received_text}」を含む日本人名を提案してください。"
 
     elif mode == 'foreign':
-        # 外国人名生成のロジック
+        # 外国人名生成用のプロンプト設定
         word_count = len(received_text.replace('、', ' ').split())
         if word_count > 3: 
             app.logger.error(f"Input text is too long for keywords. Word count: {word_count}")
@@ -207,12 +234,15 @@ def generate_name_api(data):
     else:
         return jsonify({"error": "無効なモードが指定されました。"}), 400
 
-    return call_openrouter_api(system_prompt, user_prompt, history_user_text)
+    result = call_openrouter_api(system_prompt, user_prompt, history_user_text)
+    app.logger.info("API '/api/generate_name' finished.")
+    return result
 
-# URL:/api/proofread に対するメソッドを定義
+# 文章の描写を具体化するAPI
 @app.route('/api/proofread', methods=['POST'])
 @api_endpoint
 def proofread_api(data):
+    app.logger.info("API '/api/proofread' called.")
     received_text = data['text'].strip()
     # 文字数制限をチェック
     if len(received_text) > 100:
@@ -221,12 +251,15 @@ def proofread_api(data):
 
     system_prompt = "あなたはプロの小説家です。以下のユーザーが入力した短い文章を、情景が目に浮かぶような、豊かで具体的な小説の描写に書き換えてください。\n\n# 指示:\n- 変換後の文章のみを出力し、解説や前置きは一切含めないでください。\n- 300字以内で書いてください。"
     history_user_text = f"【描写の元文章】\n{received_text}" # 履歴のフォーマットを維持
-    return call_openrouter_api(system_prompt, received_text, history_user_text)
+    result = call_openrouter_api(system_prompt, received_text, history_user_text)
+    app.logger.info("API '/api/proofread' finished.")
+    return result
 
-# URL:/api/thesaurus に対するメソッドを定義
+# 類語を検索するAPI
 @app.route('/api/thesaurus', methods=['POST'])
 @api_endpoint
 def thesaurus_api(data):
+    app.logger.info("API '/api/thesaurus' called.")
     received_text = data['text'].strip()
     # 入力が1つのキーワードであるかチェック
     word_count = len(received_text.replace('、', ' ').replace(',', ' ').split())
@@ -236,7 +269,9 @@ def thesaurus_api(data):
     system_prompt = f"あなたは語彙の専門家です。ユーザーから提供されたキーワード「{received_text}」について、類語や言い換え表現を3つ提案し、それぞれの違いが明確にわかるように解説してください。\n\n# 出力形式:\n- 提案する語彙ごとに見出しを付けてください。\n- それぞれの語彙について、「ニュアンス」と「使用例」を具体的に説明してください。\n- 全体を300字程度にまとめてください。\n- 類語や言い換え表現は日本語で提案してください。"
     user_prompt = f"「{received_text}」の類語を解説付きで教えてください。"
     history_user_text = f"「{received_text}」の類語検索"
-    return call_openrouter_api(system_prompt, user_prompt, history_user_text)
+    result = call_openrouter_api(system_prompt, user_prompt, history_user_text)
+    app.logger.info("API '/api/thesaurus' finished.")
+    return result
 
 
 # スクリプトが直接実行された場合にのみ開発サーバーを起動
