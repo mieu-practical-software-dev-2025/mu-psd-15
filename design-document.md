@@ -5,38 +5,9 @@
 物語のアイデア出しから、登場人物の名前作成、文章表現の改善まで、執筆の様々な場面でAIによるサポートを提供する。
 
 ### 1.1 システムの概要説明
-キーワード入力でたくさん入力したらエラーが出るようにする。
-そのため、物語のプロット出力はキーワード入力を10個まで、名前生成はキーワード3つまで、類語検索はひとつだけ、描写の具体化は100文字まで、と入力制限を設ける。
-
-### 1.2 システム構成図
-
-```mermaid
-graph TD
-    subgraph "ユーザー環境"
-        User[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/user.svg" width="30" /> ユーザー]
-        Browser[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/brands/chrome.svg" width="30" /> ブラウザ]
-    end
-
-    subgraph "Webサーバー (Flask)"
-        Flask[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/server.svg" width="30" /> app.py] 
-        StaticFiles[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/file-code.svg" width="30" /> 静的ファイル<br>(HTML/Vue.js)]
-        HistoryFile[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/file-lines.svg" width="30" /> history.json]
-    end
-
-    subgraph "外部サービス"
-        OpenRouter[<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/brain.svg" width="30" /> OpenRouter API]
-    end
-
-    User --> Browser
-    Browser -- "1. ページ表示リクエスト<br>(/, /plot, etc.)" --> Flask
-    Flask -- "2. 静的ファイル返却" --> StaticFiles
-    StaticFiles --> Browser
-    Browser -- "3. APIリクエスト<br>(/api/..., Fetch API)" --> Flask
-    Flask -- "4. APIリクエスト<br>(プロンプト送信)" --> OpenRouter
-    OpenRouter -- "5. AIによる生成結果" --> Flask
-    Flask -- "履歴の読み書き" <--> HistoryFile
-    Flask -- "6. JSONレスポンス" --> Browser
-```
+本システムは、ユーザーが直感的に利用できるよう、各機能に適切な入力制限を設けている。これにより、AIへの指示が不明確になることを防ぎ、質の高い応答を安定して得られるように設計されている。
+例えば、物語のプロット生成ではキーワードを10個まで、名前生成では3個までとすることで、ユーザーの意図を的確にAIに伝え、創造性を刺激するアウトプットを促す。同様に、類語検索は単一の単語に、描写の具体化は100文字以内の短文に限定することで、各機能が専門性を最大限に発揮できるようになっている。
+また、本アプリケーションは日本語の創作支援を目的としているため、各機能への入力は日本語（ひらがな、カタカナ、漢字のいずれかを含む）に限定しており、日本語を含まない入力はエラーとして処理される。
 
 ## 2. 主な機能
 
@@ -79,6 +50,7 @@ graph TD
   - `/api/history/toggle_favorite/<item_id>`: 履歴のお気に入り状態を切り替え
   - `/api/history/clear`: 全履歴を削除
 - ユーザー入力と各機能専用のシステムプロンプトを合成し、OpenRouter APIへリクエストを送信する。
+- 入力値のバリデーション（空文字チェック、文字数制限、日本語入力チェックなど）を行う。
 - 応答をJSON形式でフロントエンドに返す。
 
 ## 3. 使用技術

@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from openai import OpenAI # Import the OpenAI library
 from dotenv import load_dotenv
 from functools import wraps
+import re # 日本語チェックのために正規表現ライブラリをインポート
 import json # ファイルI/Oのために追加
 import uuid # ユニークIDを生成するために追加
 
@@ -65,6 +66,13 @@ if OPENROUTER_API_KEY:
 
 # --- Refactoring: Helper Functions and Decorators ---
 
+def is_japanese(text):
+    """文字列に日本語（ひらがな、カタカナ、漢字）が含まれているかチェックする"""
+    # 日本語の文字、句読点、一般的な記号、英数字を許容する正規表現
+    # これにより、完全に日本語以外の文字列（例: "hello world"）をブロックする
+    return re.search(r'[ぁ-んァ-ン一-龠]', text)
+
+
 def api_endpoint(f):
     """
     APIエンドポイントの共通処理をまとめたデコレータ。
@@ -87,6 +95,11 @@ def api_endpoint(f):
         if not received_text:
             app.logger.error("Received text is empty or whitespace.")
             return jsonify({"error": "Input text cannot be empty"}), 400
+        
+        received_text = data['text'].strip()
+        # 日本語入力チェック
+        if not is_japanese(received_text):
+            return jsonify({"error": "日本語で入力してください。"}), 400
          
         # 元の関数にリクエストデータを渡して実行
         return f(data)
